@@ -47,22 +47,67 @@
 
 ## Сборка
 
-На Windows-хосте Go не требуется — сборка идёт в Docker:
+### Быстро: скрипт
 
+Готовый бинарник можно не собирать — скачайте его из [Releases](https://github.com/rogazzzi/don-t_sleep/releases/latest)
+(файл `dontsleep.exe`, ~11 МБ) или по прямой ссылке:
+<https://github.com/rogazzzi/don-t_sleep/releases/download/v0.1.0/dontsleep.exe>
+
+Если нужна своя сборка, на Windows-хосте достаточно Docker (Go ставить не нужно):
+
+```powershell
+.\build.ps1
 ```
-docker run --rm -v "C:/path/to/log_monitor:/work" -w /work/dontsleep \
-  -e GOOS=windows -e GOARCH=amd64 -e CGO_ENABLED=0 \
-  golang:1.26 go build -ldflags "-s -w" -o /work/dist/dontsleep.exe .
+
+На выходе — `dist\dontsleep.exe`.
+
+### Вручную
+
+Из корня репозитория (папка, где лежит `go.mod`):
+
+```powershell
+docker run --rm `
+  -v "${PWD}:/work" -v "go-mod-cache:/go/pkg/mod" -w /work `
+  -e GOOS=windows -e GOARCH=amd64 -e CGO_ENABLED=0 `
+  -e GOPROXY=https://goproxy.cn,direct `
+  golang:1.26 go build -ldflags="-s -w" -o dist/dontsleep.exe .
 ```
 
-Результат — `dist/dontsleep.exe` (~12 МБ). Нужен установленный WebView2 Runtime
-(в Windows 10/11 он уже есть).
+Почему `GOPROXY=https://goproxy.cn,direct`: с прокси по умолчанию загрузка модулей
+(`modernc.org/libc` и другие) на некоторых сетях идёт со скоростью ~30 КБ/с.
+Зеркало отдаёт те же модули в разы быстрее. Если у вас всё качается нормально —
+параметр можно убрать.
 
-## Проверка без окна
+Named volume `go-mod-cache` кэширует модули между сборками: первая сборка дольше,
+последующие — около минуты.
 
-```
+### Требования
+
+- **Docker Desktop** (сборка в контейнере `golang:1.26`);
+- **WebView2 Runtime** — движок интерфейса. В Windows 10/11 уже установлен;
+  на старых системах — [отдельный установщик](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
+
+### Что внутри exe
+
+Интерфейс (`web/`) вшит в бинарник через `embed`, поэтому рядом с exe ничего не нужно.
+База — встроенный SQLite (без внешнего сервера), данные пишутся в `%APPDATA%\dontsleep`.
+
+### Проверка сборки
+
+```powershell
 dist\dontsleep.exe -no-window
 ```
 
 Выведет адрес локального сервера — можно открыть интерфейс в браузере
 и проверить API (`/api/health`, `/api/notes`, `/api/reminders`).
+
+### Тесты
+
+```powershell
+docker run --rm -v "${PWD}:/work" -v "go-mod-cache:/go/pkg/mod" -w /work `
+  -e GOOS=windows -e GOPROXY=https://goproxy.cn,direct `
+  golang:1.26 go test ./...
+```
+
+Тесты парсера (`parse_test.go`) проверяют разбор `@14:00`, `@завтра 9:00`,
+`@28.10 18:00`, `@через 30 мин` и перенос прошедшего времени на завтра.
