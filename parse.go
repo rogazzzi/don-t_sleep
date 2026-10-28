@@ -64,7 +64,7 @@ func parseReminder(s string, now time.Time) CaptureResult {
 
 func parseWhen(fields []string, now time.Time) (time.Time, int, string, error) {
 	loc := now.Location()
-	at := func(y int, mo time.Month, d, h, mi int) time.Time {
+	at := func(y int, mo time.Month, d, h, mi, _ int) time.Time {
 		return time.Date(y, mo, d, h, mi, 0, 0, loc)
 	}
 

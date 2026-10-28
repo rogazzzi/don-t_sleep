@@ -81,14 +81,13 @@ func main() {
 		log.Printf("автозапуск: %v", err)
 	}
 
-	startScheduler(store, hub)
-
 	if *noWindow {
 		fmt.Println(url)
 		select {}
 	}
 
 	setupNative(url, store, cfg, hub)
+	startScheduler(store, hub)
 
 	view := webview2.NewWithOptions(webview2.WebViewOptions{
 		Debug:     *debug,

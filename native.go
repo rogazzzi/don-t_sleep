@@ -63,6 +63,7 @@ var (
 	appCfg   *Config
 
 	captureOpen bool
+	exiting     bool
 
 	toastText   string
 	toastAccent uintptr
@@ -107,12 +108,12 @@ func createFont(face string, height, weight int32) uintptr {
 	lf.LfCharSet = 1  // DEFAULT_CHARSET
 	lf.LfQuality = 5  // CLEARTYPE_QUALITY
 	copy(lf.LfFaceName[:], windows.StringToUTF16(face))
-	f, _, _ := user32CreateFontIndirectW.Call(uintptr(unsafe.Pointer(&lf)))
+	f, _, _ := gdi32CreateFontIndirectW.Call(uintptr(unsafe.Pointer(&lf)))
 	return f
 }
 
 func createSolid(color uintptr) uintptr {
-	b, _, _ := user32CreateSolidBrush.Call(color)
+	b, _, _ := gdi32CreateSolidBrush.Call(color)
 	return b
 }
 
@@ -260,7 +261,8 @@ func winHiddenProc(hwnd, msg, wp, lp uintptr) uintptr {
 		requestExit()
 		return 0
 	}
-	return user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+	r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+	return r
 }
 
 func winCaptureProc(hwnd, msg, wp, lp uintptr) uintptr {
@@ -279,8 +281,8 @@ func winCaptureProc(hwnd, msg, wp, lp uintptr) uintptr {
 		return 1
 
 	case WM_CTLCOLOREDIT:
-		user32SetTextColor.Call(wp, textColor)
-		user32SetBkColor.Call(wp, bgColor)
+		gdi32SetTextColor.Call(wp, textColor)
+		gdi32SetBkColor.Call(wp, bgColor)
 		return editBrush
 
 	case WM_ACTIVATE:
@@ -297,7 +299,8 @@ func winCaptureProc(hwnd, msg, wp, lp uintptr) uintptr {
 		hideCapture()
 		return 0
 	}
-	return user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+	r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+	return r
 }
 
 func winEditProc(hwnd, msg, wp, lp uintptr) uintptr {
@@ -313,7 +316,8 @@ func winEditProc(hwnd, msg, wp, lp uintptr) uintptr {
 		}
 	}
 	if origEditProc == 0 {
-		return user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+		r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+		return r
 	}
 	return callWindowProc(origEditProc, hwnd, msg, wp, lp)
 }
@@ -334,16 +338,26 @@ func winToastProc(hwnd, msg, wp, lp uintptr) uintptr {
 		user32ShowWindow.Call(toastHwnd, SW_HIDE)
 		return 0
 	}
-	return user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+	r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+	return r
 }
 
 func winMainProc(hwnd, msg, wp, lp uintptr) uintptr {
 	if msg == WM_CLOSE {
+		if exiting {
+			// настоящий выход: отдаём событие оригинальной процедуре
+			if origMainProc == 0 {
+				r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+				return r
+			}
+			return callWindowProc(origMainProc, hwnd, msg, wp, lp)
+		}
 		hideMainWindow()
 		return 0
 	}
 	if origMainProc == 0 {
-		return user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+		r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+		return r
 	}
 	return callWindowProc(origMainProc, hwnd, msg, wp, lp)
 }
@@ -659,9 +673,9 @@ func paintToast(hwnd uintptr) {
 	bar := RECT{rc.Left, rc.Top, rc.Left + int32(4*scaleF), rc.Bottom}
 	user32FillRect.Call(hdc, uintptr(unsafe.Pointer(&bar)), toastAccent)
 
-	old := user32SelectObject.Call(hdc, uiFont)
-	user32SetBkMode.Call(hdc, TRANSPARENT)
-	user32SetTextColor.Call(hdc, textColor)
+	old, _, _ := gdi32SelectObject.Call(hdc, uiFont)
+	gdi32SetBkMode.Call(hdc, TRANSPARENT)
+	gdi32SetTextColor.Call(hdc, textColor)
 
 	textRect := RECT{
 		rc.Left + int32(18*scaleF),
@@ -673,7 +687,7 @@ func paintToast(hwnd uintptr) {
 	utf16Call(toastText, func(p uintptr) {
 		user32DrawTextW.Call(hdc, p, ^uintptr(0), uintptr(unsafe.Pointer(&textRect)), flags)
 	})
-	user32SelectObject.Call(hdc, old)
+	gdi32SelectObject.Call(hdc, old)
 }
 
 // ---------- завершение ----------
@@ -682,6 +696,7 @@ func requestExit() {
 	user32UnregisterHotKey.Call(hiddenHwnd, hotkeyID)
 	removeTrayIcon()
 	if mainHwnd != 0 {
+		exiting = true
 		// DestroyWindow → WM_DESTROY → библиотека делает PostQuitMessage
 		user32DestroyWindow.Call(mainHwnd)
 		return
