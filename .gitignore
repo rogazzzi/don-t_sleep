@@ -1,0 +1,10 @@
+# build artifacts
+/dist/
+*.exe
+*.log
+
+# локальные данные приложения
+*.db
+*.db-shm
+*.db-wal
+webview/

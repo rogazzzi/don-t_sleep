@@ -1,0 +1,562 @@
+:root {
+  --bg: #0e1016;
+  --panel: #171b25;
+  --panel-hover: #1c212c;
+  --line: #252b38;
+  --text: #e8ebf2;
+  --muted: #8a93a8;
+  --accent: #f6c453;
+  --accent-soft: rgba(246, 196, 83, 0.12);
+  --ok: #34d399;
+  --danger: #f87171;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(1000px 520px at 18% -12%, #1a2030 0%, transparent 60%),
+    radial-gradient(900px 520px at 92% -5%, #241d12 0%, transparent 55%),
+    var(--bg);
+  font: 15px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+input,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- верхняя панель ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 14px 26px;
+  background: rgba(14, 16, 22, 0.82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.moon {
+  font-size: 20px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.name {
+  font-size: 16px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: #12151d;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge {
+  display: inline-block;
+  min-width: 17px;
+  margin-left: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+  color: var(--muted);
+  background: #0f1219;
+  border-radius: 9px;
+}
+
+.badge:empty {
+  display: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.icon-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.icon-btn.active {
+  color: var(--accent);
+}
+
+.icon-btn.danger:hover {
+  color: var(--danger);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+/* ---------- быстрый ввод ---------- */
+
+.capture {
+  display: flex;
+  gap: 10px;
+  max-width: 900px;
+  width: 100%;
+  margin: 22px auto 0;
+  padding: 0 24px;
+}
+
+.capture input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.capture input::placeholder {
+  color: #6b748a;
+}
+
+.capture input:focus {
+  border-color: rgba(246, 196, 83, 0.55);
+  box-shadow: 0 0 0 3px rgba(246, 196, 83, 0.1);
+}
+
+.primary {
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #201a0c;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.primary:hover {
+  filter: brightness(1.06);
+}
+
+.primary:active {
+  filter: brightness(0.95);
+}
+
+.primary.wide {
+  width: 100%;
+  padding: 12px 0;
+  margin-top: 18px;
+}
+
+.hint {
+  max-width: 900px;
+  width: 100%;
+  margin: 9px auto 0;
+  padding: 0 24px;
+  font-size: 12.5px;
+  color: var(--muted);
+  min-height: 20px;
+  transition: color 0.2s;
+}
+
+.hint.ok {
+  color: var(--ok);
+}
+
+.hint.warn {
+  color: var(--danger);
+}
+
+/* ---------- контент ---------- */
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 24px 40px;
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+  animation: fade 0.18s ease;
+}
+
+@keyframes fade {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+.toolbar {
+  margin-bottom: 14px;
+}
+
+.toolbar input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #131720;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  color: var(--text);
+}
+
+.toolbar input::placeholder {
+  color: #6b748a;
+}
+
+.toolbar input:focus {
+  border-color: rgba(246, 196, 83, 0.4);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- карточки ---------- */
+
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.card:hover {
+  background: var(--panel-hover);
+  border-color: #2d3444;
+}
+
+.card.pinned {
+  border-color: rgba(246, 196, 83, 0.4);
+  background: linear-gradient(180deg, rgba(246, 196, 83, 0.06), var(--panel));
+}
+
+.card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tag {
+  padding: 1px 8px;
+  background: rgba(138, 147, 168, 0.12);
+  border-radius: 20px;
+  font-size: 11.5px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.card:hover .card-actions {
+  opacity: 1;
+}
+
+.stamp {
+  color: #6b748a;
+}
+
+/* ---------- напоминания ---------- */
+
+.reminder .check {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+  cursor: pointer;
+}
+
+.reminder input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #3a4254;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.reminder input[type="checkbox"]:hover {
+  border-color: var(--accent);
+}
+
+.reminder input[type="checkbox"]:checked {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.reminder input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #06231a;
+  font-weight: 700;
+}
+
+.reminder .due {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.reminder.overdue .due {
+  color: var(--danger);
+}
+
+.reminder.overdue .card-text {
+  color: #f3b0b0;
+}
+
+.reminder.done {
+  opacity: 0.5;
+}
+
+.reminder.done .card-text {
+  text-decoration: line-through;
+}
+
+/* ---------- пустое состояние ---------- */
+
+.empty {
+  display: none;
+  margin: 40px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.empty code {
+  padding: 2px 7px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: "Consolas", monospace;
+  font-size: 12.5px;
+  color: var(--accent);
+}
+
+/* ---------- статусбар ---------- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 26px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(14, 16, 22, 0.6);
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  background: #1b202b;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: #c6cddb;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* ---------- модалка ---------- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 8, 12, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-card {
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  padding: 24px;
+  background: #151923;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-card h2 {
+  margin: 0 0 18px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.switch-row input[type="checkbox"] {
+  appearance: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 12px;
+  background: #2a3140;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.switch-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #8a93a8;
+  transition: transform 0.18s, background 0.18s;
+}
+
+.switch-row input[type="checkbox"]:checked {
+  background: var(--accent-soft);
+}
+
+.switch-row input[type="checkbox"]:checked::after {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.row:last-of-type {
+  border-bottom: 0;
+}
+
+/* ---------- скроллбар ---------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262c39;
+  border-radius: 6px;
+  border: 2px solid var(--bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333b4c;
+}
