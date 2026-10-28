@@ -75,6 +75,8 @@
 
     for (const n of notes) {
       const card = el('article', 'card note' + (n.pinned ? ' pinned' : ''));
+      card.dataset.id = n.id;
+      card.dataset.kind = 'note';
 
       const body = el('div', 'card-body');
       body.appendChild(el('div', 'card-text', n.text));
@@ -134,6 +136,8 @@
     for (const r of [...open, ...done]) {
       const overdue = !r.done && r.due_at * 1000 < Date.now();
       const card = el('article', 'card reminder' + (r.done ? ' done' : '') + (overdue ? ' overdue' : ''));
+      card.dataset.id = r.id;
+      card.dataset.kind = 'reminder';
 
       const check = el('label', 'check');
       const box = document.createElement('input');
@@ -217,7 +221,6 @@
   async function loadSettings() {
     const s = await api('/api/settings');
     $('#autostartToggle').checked = !!s.autostart;
-    $('#hotkeyLabel').textContent = s.hotkey || 'Ctrl+Shift+Space';
     $('#versionLabel').textContent = 'v' + s.version;
   }
 
@@ -225,10 +228,31 @@
 
   function connectStream() {
     const es = new EventSource('/api/stream');
-    es.onmessage = () => {
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'focus') {
+          focusItem(msg.kind, msg.id);
+          return;
+        }
+      } catch (_) {}
       loadNotes().catch(() => {});
       loadReminders().catch(() => {});
     };
+  }
+
+  function focusItem(kind, id) {
+    const tab = kind === 'reminder' ? 'reminders' : 'notes';
+    switchTab(tab);
+    const card = document.querySelector(`[data-id="${id}"][data-kind="${kind}"]`);
+    if (!card) {
+      loadNotes().catch(() => {});
+      loadReminders().catch(() => {});
+      return;
+    }
+    card.classList.add('flash');
+    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setTimeout(() => card.classList.remove('flash'), 2200);
   }
 
   // ---------- события ----------

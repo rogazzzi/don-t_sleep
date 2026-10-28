@@ -126,11 +126,14 @@ const (
 
 	GWLP_WNDPROC = ^uintptr(3) // -4
 
+	MOD_ALT     = 0x0001
 	MOD_CONTROL = 0x0002
 	MOD_SHIFT   = 0x0004
 	VK_SPACE    = 0x20
 	VK_RETURN   = 0x0D
 	VK_ESCAPE   = 0x1B
+	VK_UP       = 0x26
+	VK_DOWN     = 0x28
 
 	WA_INACTIVE = 0
 
@@ -141,6 +144,23 @@ const (
 	TPM_RETURNCMD = 0x0100
 
 	EM_SETCUEBANNER = 0x1501
+
+	// ListBox
+	LBS_OWNERDRAWFIXED   = 0x0010
+	LBS_NOTIFY           = 0x0001
+	LBS_NOINTEGRALHEIGHT = 0x0100
+	WS_VSCROLL           = 0x00200000
+	LB_ADDSTRING         = 0x0180
+	LB_RESETCONTENT      = 0x0184
+	LB_SETCURSEL         = 0x0186
+	LB_GETCURSEL         = 0x0188
+	LB_GETCOUNT          = 0x018B
+	LB_SETITEMHEIGHT     = 0x01A0
+	LB_SETITEMDATA       = 0x019A
+	WM_DRAWITEM          = 0x002B
+	WM_CTLCOLORLISTBOX   = 0x0134
+	EN_CHANGE            = 0x0300
+	LBN_DBLCLK           = 0x0002
 
 	NIM_ADD    = 0
 	NIM_DELETE = 2
@@ -164,6 +184,8 @@ const (
 	SWP_SHOWWINDOW = 0x0040
 
 	DT_LEFT         = 0x0000
+	DT_RIGHT        = 0x0002
+	DT_CENTER       = 0x0001
 	DT_SINGLELINE   = 0x0020
 	DT_VCENTER      = 0x0004
 	DT_END_ELLIPSIS = 0x8000
@@ -239,6 +261,18 @@ type LOGFONTW struct {
 	LfFaceName       [32]uint16
 }
 
+type DRAWITEMSTRUCT struct {
+	CtlType    uint32
+	CtlID      uint32
+	ItemID     uint32
+	ItemAction uint32
+	ItemState  uint32
+	HwndItem   uintptr
+	Hdc        uintptr
+	RcItem     RECT
+	ItemData   uintptr
+}
+
 type NOTIFYICONDATA struct {
 	CbSize           uint32
 	HWnd             uintptr
@@ -264,11 +298,12 @@ func rgb(r, g, b byte) uintptr {
 }
 
 var (
-	clsHidden  = windows.StringToUTF16("dontsleep_hidden")
-	clsCapture = windows.StringToUTF16("dontsleep_capture")
-	clsToast   = windows.StringToUTF16("dontsleep_toast")
-	clsEdit    = windows.StringToUTF16("EDIT")
-	emptyStr   = []uint16{0}
+	clsHidden   = windows.StringToUTF16("dontsleep_hidden")
+	clsCapture  = windows.StringToUTF16("dontsleep_capture")
+	clsToast    = windows.StringToUTF16("dontsleep_toast")
+	clsOverview = windows.StringToUTF16("dontsleep_overview")
+	clsEdit     = windows.StringToUTF16("EDIT")
+	emptyStr    = []uint16{0}
 )
 
 func u16ptr(v []uint16) uintptr {

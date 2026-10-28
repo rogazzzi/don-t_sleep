@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	hotkeyID = 1
+	hotkeyID        = 1
+	hotkeyOverviewID = 2
 
 	WM_TRAYICON       = WM_USER + 1
 	WM_CAPTURE_SUBMIT = WM_USER + 10
@@ -33,15 +34,23 @@ var (
 	toastProcCb   uintptr
 	editProcCb    uintptr
 	mainProcCb    uintptr
+	overviewProcCb  uintptr
+	overviewEditCb  uintptr
+	listProcCb      uintptr
 
 	hiddenHwnd  uintptr
 	captureHwnd uintptr
 	captureEdit uintptr
 	toastHwnd   uintptr
 	mainHwnd    uintptr
+	overviewHwnd   uintptr
+	overviewEdit   uintptr
+	overviewList   uintptr
 
 	origEditProc uintptr
 	origMainProc uintptr
+	origOverviewEditProc uintptr
+	origListProc uintptr
 
 	hInstance uintptr
 	scaleF    = 1.0
@@ -56,6 +65,9 @@ var (
 
 	textColor uintptr
 	bgColor   uintptr
+	mutedColor uintptr
+	dueColor   uintptr
+	selectBrush uintptr
 
 	appURL   string
 	appStore *Store
@@ -64,6 +76,12 @@ var (
 
 	captureOpen bool
 	exiting     bool
+
+	overviewItems  []overviewItem
+	overviewAll    []overviewItem
+	overviewFilter string
+
+	uiFontSmall uintptr
 
 	toastText   string
 	toastAccent uintptr
@@ -148,27 +166,36 @@ func setupNative(url string, store *Store, cfg *Config, hub *Hub) {
 	bgColor = rgb(18, 20, 26)
 
 	uiFont = createFont("Segoe UI", int32(-17*scaleF), 400)
+	uiFontSmall = createFont("Segoe UI", int32(-13*scaleF), 400)
 	darkBrush = createSolid(bgColor)
 	editBrush = createSolid(bgColor)
 	accentBrush = createSolid(rgb(246, 196, 83))
 	okBrush = createSolid(rgb(52, 211, 153))
 	warnBrush = createSolid(rgb(251, 191, 36))
 	alarmBrush = createSolid(rgb(248, 113, 113))
+	selectBrush = createSolid(rgb(38, 42, 56))
+	mutedColor = rgb(138, 147, 168)
+	dueColor = rgb(246, 196, 83)
 
 	hiddenProcCb = windows.NewCallback(winHiddenProc)
 	captureProcCb = windows.NewCallback(winCaptureProc)
 	toastProcCb = windows.NewCallback(winToastProc)
 	editProcCb = windows.NewCallback(winEditProc)
 	mainProcCb = windows.NewCallback(winMainProc)
+	overviewProcCb = windows.NewCallback(winOverviewProc)
+	overviewEditCb = windows.NewCallback(winOverviewEditProc)
+	listProcCb = windows.NewCallback(winListProc)
 
 	cursor, _, _ := user32LoadCursorW.Call(0, IDC_ARROW)
 	registerClass(clsHidden, hiddenProcCb, 0, cursor)
 	registerClass(clsCapture, captureProcCb, darkBrush, cursor)
 	registerClass(clsToast, toastProcCb, darkBrush, cursor)
+	registerClass(clsOverview, overviewProcCb, darkBrush, cursor)
 
 	createHiddenWindow()
 	createCaptureWindow()
 	createToastWindow()
+	createOverviewWindow()
 
 	addTrayIcon()
 	registerHotkey()
@@ -241,6 +268,8 @@ func winHiddenProc(hwnd, msg, wp, lp uintptr) uintptr {
 	case WM_HOTKEY:
 		if wp == hotkeyID {
 			showCapture()
+		} else if wp == hotkeyOverviewID {
+			showOverview()
 		}
 		return 0
 
@@ -373,6 +402,10 @@ func registerHotkey() {
 	r, _, err := user32RegisterHotKey.Call(hiddenHwnd, hotkeyID, MOD_CONTROL|MOD_SHIFT, VK_SPACE)
 	if r == 0 {
 		log.Printf("не удалось занять Ctrl+Shift+Space: %v", err)
+	}
+	r, _, err = user32RegisterHotKey.Call(hiddenHwnd, hotkeyOverviewID, MOD_ALT|MOD_SHIFT, VK_SPACE)
+	if r == 0 {
+		log.Printf("не удалось занять Alt+Shift+Space: %v", err)
 	}
 }
 
@@ -560,6 +593,411 @@ func submitCapture() {
 	}
 }
 
+// ---------- окно обзора (Alt+Shift+Space) ----------
+
+type overviewItem struct {
+	Kind     string // "note" | "reminder"
+	ID       int64
+	Text     string
+	DueAt    int64
+	DueLabel string
+}
+
+func createOverviewWindow() {
+	w := uintptr(640 * scaleF)
+	h := uintptr(430 * scaleF)
+	overviewHwnd, _, _ = user32CreateWindowExW.Call(
+		uintptr(WS_EX_TOPMOST|WS_EX_TOOLWINDOW),
+		u16ptr(clsOverview), u16ptr(clsOverview),
+		uintptr(WS_POPUP|WS_CLIPCHILDREN),
+		0, 0, w, h, 0, 0, hInstance, 0)
+
+	pad := uintptr(10 * scaleF)
+	editH := uintptr(38 * scaleF)
+	overviewEdit, _, _ = user32CreateWindowExW.Call(
+		0, u16ptr(clsEdit), 0,
+		uintptr(WS_CHILD|WS_VISIBLE|ES_AUTOHSCROLL|ES_NOHIDESEL),
+		pad, pad, w-2*pad, editH, overviewHwnd, 0, hInstance, 0)
+	user32SendMessageW.Call(overviewEdit, WM_SETFONT, uiFont, 1)
+	utf16Call("Поиск по заметкам и напоминаниям…", func(p uintptr) {
+		user32SendMessageW.Call(overviewEdit, EM_SETCUEBANNER, 1, p)
+	})
+
+	listY := pad + editH + uintptr(8*scaleF)
+	listH := h - listY - pad
+	overviewList, _, _ = user32CreateWindowExW.Call(
+		0, u16ptr(windows.StringToUTF16("LISTBOX")), 0,
+		uintptr(WS_CHILD|WS_VISIBLE|WS_VSCROLL|LBS_OWNERDRAWFIXED|LBS_NOTIFY|LBS_NOINTEGRALHEIGHT),
+		pad, listY, w-2*pad, listH, overviewHwnd, 0, hInstance, 0)
+	user32SendMessageW.Call(overviewList, LB_SETITEMHEIGHT, 0, uintptr(int64(46*scaleF)))
+	user32SendMessageW.Call(overviewList, WM_SETFONT, uiFont, 1)
+
+	orig, _, _ := user32SetWindowLongPtrW.Call(overviewEdit, GWLP_WNDPROC, overviewEditCb)
+	origOverviewEditProc = orig
+	orig2, _, _ := user32SetWindowLongPtrW.Call(overviewList, GWLP_WNDPROC, listProcCb)
+	origListProc = orig2
+}
+
+func placeOverview() {
+	w := int32(640 * scaleF)
+	h := int32(430 * scaleF)
+	work := cursorMonitorWork()
+	x := work.Left + (work.Right-work.Left-w)/2
+	y := work.Top + int32(70*scaleF)
+	user32SetWindowPos.Call(overviewHwnd, HWND_TOPMOST,
+		uintptr(int64(x)), uintptr(int64(y)), uintptr(int64(w)), uintptr(int64(h)),
+		SWP_NOACTIVATE)
+}
+
+func showOverview() {
+	if overviewHwnd == 0 {
+		return
+	}
+	user32SetWindowTextW.Call(overviewEdit, u16ptr(emptyStr))
+	overviewFilter = ""
+	gatherOverviewData()
+	refreshOverviewList()
+	placeOverview()
+	user32ShowWindow.Call(overviewHwnd, SW_SHOW)
+	forceForeground(overviewHwnd)
+	user32SetFocus.Call(overviewEdit)
+}
+
+func hideOverview() {
+	if overviewHwnd == 0 {
+		return
+	}
+	user32ShowWindow.Call(overviewHwnd, SW_HIDE)
+}
+
+func gatherOverviewData() {
+	items := []overviewItem{}
+
+	if appStore != nil {
+		if rems, err := appStore.Reminders(); err == nil {
+			for _, r := range rems {
+				if r.Done {
+					continue
+				}
+				items = append(items, overviewItem{
+					Kind: "reminder", ID: r.ID, Text: r.Text,
+					DueAt: r.DueAt, DueLabel: fmtDueLabel(r.DueAt),
+				})
+			}
+		}
+		if notes, err := appStore.Notes(""); err == nil {
+			limit := 15
+			if len(notes) > limit {
+				notes = notes[:limit]
+			}
+			for _, n := range notes {
+				items = append(items, overviewItem{Kind: "note", ID: n.ID, Text: n.Text, DueAt: n.CreatedAt})
+			}
+		}
+	}
+
+	overviewAll = items
+	applyOverviewFilter()
+}
+
+func applyOverviewFilter() {
+	f := strings.ToLower(overviewFilter)
+	overviewItems = overviewAll[:0]
+	for _, it := range overviewAll {
+		if f == "" || strings.Contains(strings.ToLower(it.Text), f) {
+			overviewItems = append(overviewItems, it)
+		}
+	}
+}
+
+func refreshOverviewList() {
+	if overviewList == 0 {
+		return
+	}
+	user32SendMessageW.Call(overviewList, LB_RESETCONTENT, 0, 0)
+	for i := range overviewItems {
+		user32SendMessageW.Call(overviewList, LB_ADDSTRING, 0, 0)
+		user32SendMessageW.Call(overviewList, LB_SETITEMDATA, uintptr(i), uintptr(i))
+	}
+	if len(overviewItems) > 0 {
+		user32SendMessageW.Call(overviewList, LB_SETCURSEL, 0, 0)
+	}
+	user32InvalidateRect.Call(overviewList, 0, 1)
+}
+
+func overviewSelected() *overviewItem {
+	cur, _, _ := user32SendMessageW.Call(overviewList, LB_GETCURSEL, 0, 0)
+	if int64(cur) < 0 || int64(cur) >= int64(len(overviewItems)) {
+		return nil
+	}
+	return &overviewItems[int(cur)]
+}
+
+// overviewActivate — Enter или двойной клик: открываем главное окно и подсвечиваем элемент.
+func overviewActivate() {
+	it := overviewSelected()
+	if it == nil {
+		return
+	}
+	hideOverview()
+	showMainWindow()
+	if appHub != nil {
+		appHub.Broadcast(map[string]any{"type": "focus", "kind": it.Kind, "id": it.ID})
+	}
+}
+
+func overviewToggleDone() {
+	it := overviewSelected()
+	if it == nil || it.Kind != "reminder" {
+		return
+	}
+	if appStore != nil {
+		_ = appStore.SetReminderDone(it.ID, true)
+	}
+	gatherOverviewData()
+	refreshOverviewList()
+	if appHub != nil {
+		appHub.Broadcast(map[string]any{"type": "reminder", "action": "changed"})
+	}
+}
+
+func fmtDueLabel(ts int64) string {
+	t := time.Unix(ts, 0)
+	now := time.Now()
+	y1, m1, d1 := t.Date()
+	y2, m2, d2 := now.Date()
+	hm := t.Format("15:04")
+	switch {
+	case y1 == y2 && m1 == m2 && d1 == d2:
+		return "сегодня в " + hm
+	case y1 == y2 && m1 == m2 && d1 == d2+1:
+		return "завтра в " + hm
+	case t.Before(now):
+		return "просрочено · " + t.Format("02.01 15:04")
+	default:
+		return t.Format("02.01 ") + hm
+	}
+}
+
+func winOverviewProc(hwnd, msg, wp, lp uintptr) uintptr {
+	switch msg {
+	case WM_PAINT:
+		var ps PAINTSTRUCT
+		hdc, _, _ := user32BeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+		var rc RECT
+		user32GetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
+		user32FillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), darkBrush)
+		user32FrameRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), accentBrush)
+		user32EndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+		return 0
+
+	case WM_ERASEBKGND:
+		return 1
+
+	case WM_CTLCOLOREDIT:
+		gdi32SetTextColor.Call(wp, textColor)
+		gdi32SetBkColor.Call(wp, bgColor)
+		return editBrush
+
+	case WM_CTLCOLORLISTBOX:
+		gdi32SetTextColor.Call(wp, textColor)
+		gdi32SetBkColor.Call(wp, bgColor)
+		return editBrush
+
+	case WM_DRAWITEM:
+		dis := (*DRAWITEMSTRUCT)(unsafe.Pointer(lp))
+		if dis.CtlType == 0x0004 { // ODT_LISTBOX
+			drawOverviewItem(dis)
+			return 1
+		}
+		return 0
+
+	case WM_COMMAND:
+		// уведомления от дочерних окон
+		notify := uint32(wp) >> 16
+		ctlID := uint32(wp) & 0xFFFF
+		switch notify {
+		case EN_CHANGE:
+			overviewFilter = getEditText(overviewEdit)
+			applyOverviewFilter()
+			refreshOverviewList()
+		case LBN_DBLCLK:
+			if ctlID == 0 {
+				overviewActivate()
+			}
+		}
+		return 0
+
+	case WM_ACTIVATE:
+		if wp == WA_INACTIVE {
+			hideOverview()
+		}
+		return 0
+	}
+	r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+	return r
+}
+
+func winOverviewEditProc(hwnd, msg, wp, lp uintptr) uintptr {
+	switch msg {
+	case WM_KEYDOWN:
+		switch wp {
+		case VK_DOWN:
+			moveListSel(1)
+			return 0
+		case VK_UP:
+			moveListSel(-1)
+			return 0
+		case VK_RETURN:
+			overviewActivate()
+			return 0
+		case VK_ESCAPE:
+			hideOverview()
+			return 0
+		}
+	}
+	if origOverviewEditProc == 0 {
+		r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+		return r
+	}
+	return callWindowProc(origOverviewEditProc, hwnd, msg, wp, lp)
+}
+
+func moveListSel(delta int) {
+	cur, _, _ := user32SendMessageW.Call(overviewList, LB_GETCURSEL, 0, 0)
+	count, _, _ := user32SendMessageW.Call(overviewList, LB_GETCOUNT, 0, 0)
+	if count == 0 {
+		return
+	}
+	n := int(int64(cur)) + delta
+	if n < 0 {
+		n = 0
+	}
+	if n >= int(count) {
+		n = int(count) - 1
+	}
+	user32SendMessageW.Call(overviewList, LB_SETCURSEL, uintptr(n), 0)
+	user32InvalidateRect.Call(overviewList, 0, 1)
+}
+
+// winListProc — обработка кликов по списку (чекбоксы напоминаний).
+func winListProc(hwnd, msg, wp, lp uintptr) uintptr {
+	switch msg {
+	case WM_LBUTTONUP:
+		pt := lParamToPoint(lp)
+		var rc RECT
+		user32GetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&rc)))
+		itemH := int32(46 * scaleF)
+		idx := int(pt.Y) / int(itemH)
+		if pt.X < int32(38*scaleF) && idx >= 0 && idx < len(overviewItems) {
+			it := &overviewItems[idx]
+			if it.Kind == "reminder" {
+				user32SendMessageW.Call(overviewList, LB_SETCURSEL, uintptr(idx), 0)
+				overviewToggleDone()
+				return 0
+			}
+		}
+	}
+
+	if origListProc == 0 {
+		r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
+		return r
+	}
+	return callWindowProc(origListProc, hwnd, msg, wp, lp)
+}
+
+func lParamToPoint(lp uintptr) POINT {
+	return POINT{
+		X: int32(int16(lp & 0xFFFF)),
+		Y: int32(int16((lp >> 16) & 0xFFFF)),
+	}
+}
+
+func drawOverviewItem(dis *DRAWITEMSTRUCT) {
+	idx := int(dis.ItemData)
+	if idx < 0 || idx >= len(overviewItems) {
+		return
+	}
+	it := &overviewItems[idx]
+	rc := dis.RcItem
+	hdc := dis.Hdc
+
+	selected := dis.ItemState&0x0010 != 0 // ODS_SELECTED
+	bg := darkBrush
+	if selected {
+		bg = selectBrush
+	}
+	user32FillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), bg)
+
+	oldFont, _, _ := gdi32SelectObject.Call(hdc, uiFont)
+	gdi32SetBkMode.Call(hdc, TRANSPARENT)
+
+	if it.Kind == "reminder" {
+		// чекбокс
+		cb := RECT{
+			rc.Left + int32(14*scaleF),
+			rc.Top + (rc.Bottom-rc.Top-int32(20*scaleF))/2,
+			rc.Left + int32(14*scaleF) + int32(20*scaleF),
+			rc.Top + (rc.Bottom-rc.Top-int32(20*scaleF))/2 + int32(20*scaleF),
+		}
+		user32FrameRect.Call(hdc, uintptr(unsafe.Pointer(&cb)), dueColor)
+		gdi32SetTextColor.Call(hdc, dueColor)
+		utf16Call("✓", func(p uintptr) {
+			user32DrawTextW.Call(hdc, p, ^uintptr(0),
+				uintptr(unsafe.Pointer(&cb)), DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+		})
+
+		// текст
+		textRc := RECT{
+			cb.Right + int32(12*scaleF), rc.Top,
+			rc.Right - int32(120*scaleF), rc.Bottom,
+		}
+		gdi32SetTextColor.Call(hdc, textColor)
+		utf16Call(it.Text, func(p uintptr) {
+			user32DrawTextW.Call(hdc, p, ^uintptr(0),
+				uintptr(unsafe.Pointer(&textRc)),
+				DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX|DT_END_ELLIPSIS)
+		})
+
+		// время справа
+		dueRc := RECT{
+			rc.Right - int32(116*scaleF), rc.Top,
+			rc.Right - int32(14*scaleF), rc.Bottom,
+		}
+		gdi32SetTextColor.Call(hdc, dueColor)
+		utf16Call(it.DueLabel, func(p uintptr) {
+			user32DrawTextW.Call(hdc, p, ^uintptr(0),
+				uintptr(unsafe.Pointer(&dueRc)),
+				DT_RIGHT|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX|DT_END_ELLIPSIS)
+		})
+	} else {
+		// маркер заметки
+		gdi32SetTextColor.Call(hdc, mutedColor)
+		markerRc := RECT{
+			rc.Left + int32(14*scaleF), rc.Top,
+			rc.Left + int32(40*scaleF), rc.Bottom,
+		}
+		utf16Call("·", func(p uintptr) {
+			user32DrawTextW.Call(hdc, p, ^uintptr(0),
+				uintptr(unsafe.Pointer(&markerRc)),
+				DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+		})
+
+		textRc := RECT{
+			rc.Left + int32(46*scaleF), rc.Top,
+			rc.Right - int32(14*scaleF), rc.Bottom,
+		}
+		gdi32SetTextColor.Call(hdc, textColor)
+		utf16Call(it.Text, func(p uintptr) {
+			user32DrawTextW.Call(hdc, p, ^uintptr(0),
+				uintptr(unsafe.Pointer(&textRc)),
+				DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX|DT_END_ELLIPSIS)
+		})
+	}
+
+	gdi32SelectObject.Call(hdc, oldFont)
+}
+
 // ---------- главное окно ----------
 
 func subclassMainWindow(hwnd uintptr) {
@@ -694,6 +1132,7 @@ func paintToast(hwnd uintptr) {
 
 func requestExit() {
 	user32UnregisterHotKey.Call(hiddenHwnd, hotkeyID)
+	user32UnregisterHotKey.Call(hiddenHwnd, hotkeyOverviewID)
 	removeTrayIcon()
 	if mainHwnd != 0 {
 		exiting = true
