@@ -1,76 +1,123 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>don't sleep</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>don't sleep — заметки и напоминания</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="moon">☾</span>
-      <span class="name">don't sleep</span>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#e19a2b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="13" r="7.2"/>
+        <path d="M12 9.8V13l2.2 1.6"/>
+        <path d="M5.4 5.1 7.2 3.6M18.6 5.1l-1.8-1.5"/>
+        <path d="M4.6 20.2l1.6-1.6M19.4 20.2l-1.6-1.6"/>
+      </svg>
     </div>
-
-    <nav class="tabs">
-      <button class="tab active" data-tab="notes">Заметки <span class="badge" id="notesBadge"></span></button>
-      <button class="tab" data-tab="reminders">Напоминания <span class="badge" id="remindersBadge"></span></button>
-    </nav>
-
-    <div class="spacer"></div>
-
-    <button class="icon-btn" id="settingsBtn" title="Настройки">⚙</button>
-  </header>
-
-  <section class="capture">
-    <input id="quickInput" type="text" autocomplete="off" spellcheck="false"
-           placeholder="Быстрая запись…   (начни с @14:00 — создастся напоминание)">
-    <button id="addBtn" class="primary">Добавить</button>
-  </section>
-  <p class="hint" id="hint">Enter — сохранить. Без @ — заметка, с @ — напоминание.</p>
-
-  <main>
-    <section id="notesView" class="view active">
-      <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="Поиск по заметкам и тегам…">
-      </div>
-      <div id="notesList" class="list"></div>
-      <div id="notesEmpty" class="empty">Пока пусто — запиши первую мысль выше ↑</div>
-    </section>
-
-    <section id="remindersView" class="view">
-      <div id="remindersList" class="list"></div>
-      <div id="remindersEmpty" class="empty">Напоминаний нет. Добавь, например: <code>@14:00 позвонить в банк</code></div>
-    </section>
-  </main>
-
-  <footer class="statusbar">
-    <span>
-      <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> — быстрая запись ·
-      <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> — обзор
-    </span>
-    <span class="muted" id="statusRight">данные хранятся локально</span>
-  </footer>
-
-  <div id="settingsModal" class="modal hidden">
-    <div class="modal-card">
-      <h2>Настройки</h2>
-
-      <label class="switch-row">
-        <span>Запускать при входе в Windows</span>
-        <input id="autostartToggle" type="checkbox">
-      </label>
-
-      <div class="row"><span>Быстрая запись</span><kbd>Ctrl + Shift + Space</kbd></div>
-      <div class="row"><span>Обзор заметок и напоминаний</span><kbd>Alt + Shift + Space</kbd></div>
-      <div class="row"><span>Версия</span><span id="versionLabel" class="muted"></span></div>
-      <div class="row"><span>Данные</span><span class="muted">%APPDATA%\dontsleep</span></div>
-
-      <button id="closeSettings" class="primary wide">Готово</button>
-    </div>
+    <div class="brand-name">don't&nbsp;<span>sleep</span></div>
   </div>
 
-  <script src="app.js"></script>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="notes">Заметки<span class="tab-badge" id="badge-notes">0</span></button>
+    <button class="tab" data-tab="reminders">Напоминания<span class="tab-badge" id="badge-reminders">0</span></button>
+  </nav>
+
+  <div class="topbar-spacer"></div>
+
+  <button class="icon-btn" id="btn-settings" title="Настройки">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3.1"/>
+      <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a1.9 1.9 0 1 1-2.7 2.7l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a1.9 1.9 0 1 1-3.8 0v-.2a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a1.9 1.9 0 1 1-2.7-2.7l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a1.9 1.9 0 1 1 0-3.8h.2a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a1.9 1.9 0 1 1 2.7-2.7l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a1.9 1.9 0 1 1 3.8 0v.2a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a1.9 1.9 0 1 1 2.7 2.7l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a1.9 1.9 0 1 1 0 3.8h-.2a1.6 1.6 0 0 0-1.5 1z"/>
+    </svg>
+  </button>
+</header>
+
+<main class="main">
+  <div class="sheet">
+
+    <section class="composer">
+      <form class="composer-box" id="composer" autocomplete="off">
+        <input id="composer-input" type="text" placeholder="Что нужно запомнить?" aria-label="Быстрая запись">
+        <button class="composer-send" type="submit" title="Сохранить">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/>
+          </svg>
+        </button>
+      </form>
+      <div class="composer-hint">
+        <span>Обычный текст — заметка.</span>
+        <span>Начни с <span class="hint-chip">@14:30</span> — получится напоминание.</span>
+      </div>
+    </section>
+
+    <section id="view-notes">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+          <circle cx="11" cy="11" r="6.6"/>
+          <path d="m16 16 4.2 4.2"/>
+        </svg>
+        <input id="search" type="search" placeholder="Поиск по заметкам…" aria-label="Поиск">
+      </div>
+      <div id="notes-list"></div>
+    </section>
+
+    <section id="view-reminders" class="hidden">
+      <div id="reminders-list"></div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <span class="footer-item"><span class="kbd">Ctrl</span> <span class="kbd">Shift</span> <span class="kbd">Space</span> быстрая запись</span>
+  <span class="footer-item"><span class="kbd">Alt</span> <span class="kbd">Shift</span> <span class="kbd">Space</span> обзор</span>
+  <span class="footer-spacer"></span>
+  <span class="footer-item" id="footer-status">всё локально</span>
+</footer>
+
+<div class="modal-backdrop hidden" id="settings-modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal-head">
+      <h2 class="modal-title" id="settings-title">Настройки</h2>
+      <button class="icon-btn" id="btn-settings-close" title="Закрыть">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="m6 6 12 12M18 6 6 18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-text">
+        <div class="setting-name">Запускать при входе в Windows</div>
+        <div class="setting-sub">Приложение будет ждать в трее и напомнит вовремя</div>
+      </div>
+      <button class="switch" id="switch-autostart" role="switch" aria-checked="false"><span></span></button>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-text">
+        <div class="setting-name">Быстрая запись</div>
+        <div class="setting-sub" id="hotkey-label">Ctrl + Shift + Space</div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-text">
+        <div class="setting-name">Обзор заметок</div>
+        <div class="setting-sub">Alt + Shift + Space</div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <span id="version-label">don't sleep</span>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
