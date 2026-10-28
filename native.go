@@ -415,11 +415,29 @@ func addTrayIcon() {
 	nid.UID = 1
 	nid.UFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
 	nid.UCallbackMessage = WM_TRAYICON
-	icon, _, _ := user32LoadImageW.Call(0, IDI_APPLICATION, IMAGE_ICON, 0, 0, LR_SHARED|LR_DEFAULTSIZE)
-	nid.HIcon = icon
+	nid.HIcon = loadAppIcon(smallIconSize())
+	if nid.HIcon == 0 {
+		nid.HIcon, _, _ = user32LoadImageW.Call(0, IDI_APPLICATION, IMAGE_ICON, 0, 0, LR_SHARED|LR_DEFAULTSIZE)
+	}
 	tip := windows.StringToUTF16("don't sleep — заметки и напоминания")
 	copy(nid.SzTip[:], tip)
 	shell32ShellNotifyIconW.Call(NIM_ADD, uintptr(unsafe.Pointer(&nid)))
+}
+
+// smallIconSize — сторона маленькой иконки с учётом масштаба экрана.
+func smallIconSize() int32 {
+	r, _, _ := user32GetSystemMetrics.Call(SM_CXSMICON)
+	if r == 0 {
+		return 16
+	}
+	return int32(r)
+}
+
+// loadAppIcon берёт иконку приложения из встроенного ресурса (rsrc.syso).
+func loadAppIcon(size int32) uintptr {
+	h, _, _ := user32LoadImageW.Call(hInstance, 1, IMAGE_ICON,
+		uintptr(size), uintptr(size), 0)
+	return h
 }
 
 func removeTrayIcon() {
@@ -1015,6 +1033,13 @@ func subclassMainWindow(hwnd uintptr) {
 	if orig == 0 {
 		log.Printf("не удалось перехватить закрытие главного окна")
 		return
+	}
+
+	if big := loadAppIcon(32); big != 0 {
+		user32SendMessageW.Call(hwnd, WM_SETICON, ICON_BIG, big)
+	}
+	if small := loadAppIcon(smallIconSize()); small != 0 {
+		user32SendMessageW.Call(hwnd, WM_SETICON, ICON_SMALL, small)
 	}
 
 	one := int32(1)

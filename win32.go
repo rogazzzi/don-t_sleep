@@ -103,8 +103,15 @@ const (
 	WM_RBUTTONUP      = 0x0205
 	WM_HOTKEY         = 0x0312
 	WM_SETFONT        = 0x0030
+	WM_SETICON        = 0x0080
 	WM_USER           = 0x0400
 	WM_QUIT           = 0x0012
+
+	ICON_SMALL = 0
+	ICON_BIG   = 1
+
+	SM_CXICON   = 11
+	SM_CXSMICON = 49
 
 	WS_OVERLAPPEDWINDOW = 0x00CF0000
 	WS_POPUP            = 0x80000000

@@ -16,7 +16,7 @@ import (
 	webview2 "github.com/jchv/go-webview2"
 )
 
-const appVersion = "0.1.0"
+const appVersion = "0.1.1"
 
 //go:embed web
 var webAssets embed.FS
