@@ -55,6 +55,7 @@ var (
 	user32MessageBeep            = user32.NewProc("MessageBeep")
 	user32CreatePopupMenu        = user32.NewProc("CreatePopupMenu")
 	user32AppendMenuW            = user32.NewProc("AppendMenuW")
+	user32BringWindowToTop       = user32.NewProc("BringWindowToTop")
 	user32TrackPopupMenu         = user32.NewProc("TrackPopupMenu")
 	user32DestroyMenu            = user32.NewProc("DestroyMenu")
 	user32FillRect               = user32.NewProc("FillRect")
@@ -190,6 +191,9 @@ const (
 	DT_VCENTER      = 0x0004
 	DT_END_ELLIPSIS = 0x8000
 	DT_NOPREFIX     = 0x0800
+
+	ODT_LISTBOX    = 2
+	VK_MENU        = 0x12
 
 	TRANSPARENT = 1
 

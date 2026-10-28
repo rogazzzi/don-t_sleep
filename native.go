@@ -68,6 +68,7 @@ var (
 	mutedColor uintptr
 	dueColor   uintptr
 	selectBrush uintptr
+	dueBrush    uintptr
 
 	appURL   string
 	appStore *Store
@@ -174,6 +175,7 @@ func setupNative(url string, store *Store, cfg *Config, hub *Hub) {
 	warnBrush = createSolid(rgb(251, 191, 36))
 	alarmBrush = createSolid(rgb(248, 113, 113))
 	selectBrush = createSolid(rgb(38, 42, 56))
+	dueBrush = createSolid(rgb(246, 196, 83))
 	mutedColor = rgb(138, 147, 168)
 	dueColor = rgb(246, 196, 83)
 
@@ -315,9 +317,6 @@ func winCaptureProc(hwnd, msg, wp, lp uintptr) uintptr {
 		return editBrush
 
 	case WM_ACTIVATE:
-		if wp == WA_INACTIVE {
-			hideCapture()
-		}
 		return 0
 
 	case WM_CAPTURE_SUBMIT:
@@ -470,6 +469,10 @@ func showCapture() {
 	if captureHwnd == 0 {
 		return
 	}
+	if isVisible(captureHwnd) {
+		hideCapture()
+		return
+	}
 	user32SetWindowTextW.Call(captureEdit, u16ptr(emptyStr))
 	placeCapture()
 	user32ShowWindow.Call(captureHwnd, SW_SHOW)
@@ -529,6 +532,7 @@ func forceForeground(hwnd uintptr) {
 	if fg == hwnd {
 		return
 	}
+
 	fgTid, _, _ := user32GetWindowThreadProcess.Call(fg, 0)
 	myTid, _, _ := user32GetWindowThreadProcess.Call(hwnd, 0)
 	attached := false
@@ -536,6 +540,7 @@ func forceForeground(hwnd uintptr) {
 		user32AttachThreadInput.Call(fgTid, myTid, 1)
 		attached = true
 	}
+	user32BringWindowToTop.Call(hwnd)
 	user32SetForegroundWindow.Call(hwnd)
 	user32SetActiveWindow.Call(hwnd)
 	if attached {
@@ -651,6 +656,10 @@ func placeOverview() {
 
 func showOverview() {
 	if overviewHwnd == 0 {
+		return
+	}
+	if isVisible(overviewHwnd) {
+		hideOverview()
 		return
 	}
 	user32SetWindowTextW.Call(overviewEdit, u16ptr(emptyStr))
@@ -806,7 +815,7 @@ func winOverviewProc(hwnd, msg, wp, lp uintptr) uintptr {
 
 	case WM_DRAWITEM:
 		dis := (*DRAWITEMSTRUCT)(unsafe.Pointer(lp))
-		if dis.CtlType == 0x0004 { // ODT_LISTBOX
+		if dis.CtlType == ODT_LISTBOX {
 			drawOverviewItem(dis)
 			return 1
 		}
@@ -829,9 +838,8 @@ func winOverviewProc(hwnd, msg, wp, lp uintptr) uintptr {
 		return 0
 
 	case WM_ACTIVATE:
-		if wp == WA_INACTIVE {
-			hideOverview()
-		}
+		// намеренно не скрываем по потере фокуса: окно должно оставаться,
+		// пока пользователь не закроет его (Esc / Enter / повторная клавиша)
 		return 0
 	}
 	r, _, _ := user32DefWindowProcW.Call(hwnd, msg, wp, lp)
@@ -940,7 +948,7 @@ func drawOverviewItem(dis *DRAWITEMSTRUCT) {
 			rc.Left + int32(14*scaleF) + int32(20*scaleF),
 			rc.Top + (rc.Bottom-rc.Top-int32(20*scaleF))/2 + int32(20*scaleF),
 		}
-		user32FrameRect.Call(hdc, uintptr(unsafe.Pointer(&cb)), dueColor)
+		user32FrameRect.Call(hdc, uintptr(unsafe.Pointer(&cb)), dueBrush)
 		gdi32SetTextColor.Call(hdc, dueColor)
 		utf16Call("✓", func(p uintptr) {
 			user32DrawTextW.Call(hdc, p, ^uintptr(0),
